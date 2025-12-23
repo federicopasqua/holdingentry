@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+<title>ATPL Holding Trainer</title>
+<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+</head>
+<body>
+    <div id="app">
+
+        <div id="info"></div>
+        <canvas id="dg"></canvas>
+
+
+        <div id="result"></div>
+
+        <div id="controls">
+            <button class="answer-button" onclick="answer('Direct')">Direct (D)</button>
+            <button class="answer-button" onclick="answer('Parallel')">Parallel (P)</button>
+            <button class="answer-button" onclick="answer('Teardrop')">Teardrop (T)</button>
+            <button id="next-button" onclick="nextQuestion()">Next (Enter)</button>
+        </div>
+
+        <script src="game.js"></script>
+    </div>
+</body>
+</html>

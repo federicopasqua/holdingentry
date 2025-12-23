@@ -1,0 +1,73 @@
+html, body {
+    height: 100%;
+}
+
+body {
+    background: black;
+    color: white;
+    font-family: Arial;
+    text-align: center;
+    margin: 0;
+    overflow: hidden;
+    touch-action: manipulation;
+    height: 100%;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+}
+
+canvas {
+    background: black;
+}
+
+#controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 12px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 90%;
+}
+
+button {
+    flex: 1;
+    white-space: nowrap;
+    flex-basis: 30%;
+    margin: 6px;
+    padding: 32px;
+    font-size: 1.1rem;
+    border-radius: 12px;
+    border: none;
+    background: #222;
+    color: white;
+    min-width: 160px;
+    max-width: 320px;
+}
+
+@media ( max-width: 600px) {
+    button {
+        flex-basis: 100%;
+        padding-top: 16px;
+        padding-bottom: 16px;
+    }
+}
+
+button:active {
+    background: #444;
+}
+
+#info, #result {
+    font-size: 2rem;
+    margin: 8px;
+}
+
+@media ( max-width: 600px) {
+    #info {
+        font-size: 1.5rem;
+    }
+}
