@@ -22,7 +22,58 @@ body {
 
 canvas {
     background: black;
+    display: block;
 }
+
+#canvas-wrap {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+#settings {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    font-size: 1rem;
+}
+
+#settings select {
+    background: #222;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 1rem;
+}
+
+#radial-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+#radial-toggle input {
+    width: 20px;
+    height: 20px;
+}
+
+#info { white-space: pre-line; }
+
+#result { white-space: pre-line; min-height: 1.2em; }
+
+.mode-intercept #info { font-size: 1.5rem; min-height: 2.4em; }
+.mode-intercept #result { font-size: 1.1rem; min-height: 4.2em; max-width: 900px; }
+
+.mode-intercept button.ic-only { flex-basis: 22%; min-width: 120px; padding: 24px 12px; }
+
 
 #controls {
     display: flex;
@@ -50,6 +101,9 @@ button {
 }
 
 @media ( max-width: 600px) {
+    .mode-intercept button.ic-only { flex-basis: 40%; min-width: 0; padding: 14px 8px; }
+    .mode-intercept #info { font-size: 1.1rem; }
+    .mode-intercept #result { font-size: 0.9rem; }
     button {
         flex-basis: 100%;
         padding-top: 16px;
