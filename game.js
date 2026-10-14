@@ -9,7 +9,10 @@ let heading, inbound, standard, correct;
 
 // ---- app state ----
 let mode = "holding";        // "holding" | "intercept"
+let format = "radial";       // intercept mode: "radial" | "qdm" | "mixed"
+let showRMI = false;         // intercept mode: draw an RMI needle (bearing to station)
 let showRadial = true;       // intercept mode: draw the VOR course / deviation on the rose
+let lastIdx = -1;            // option answered in the current intercept question
 let ic = null;               // current intercept question
 
 const DOT_DEG = 5;           // degrees per dot (VOR: 2 dots each side = 10 deg full scale)
@@ -120,6 +123,7 @@ function drawDG() {
 
     if (mode === "holding") drawHoldCourse();
     else if (showRadial) drawVorCourse();
+    if (mode === "intercept" && showRMI) drawRMI();
 
     // Airbus-style aircraft symbol (yellow)
     ctx.strokeStyle = "yellow";
@@ -307,11 +311,18 @@ function drawArrow(x, y, angle, size) {
 // ======================================================================
 
 function newIntercept() {
+    lastIdx = -1;
     heading = Math.floor(Math.random() * 360);
     const radial = Math.floor(Math.random() * 360) + 1;
+    // QDM = bearing TO the station (inbound), QDR = bearing FROM the station (outbound = the radial)
+    const useQdm = format === "qdm" || (format === "mixed" && Math.random() < 0.5);
     const outbound = Math.random() < 0.5;
-    const A = Math.random() < 0.5 ? 30 : 45;                   // intercept angle
-    const d = (3 + Math.floor(Math.random() * 23)) * (Math.random() < 0.5 ? -1 : 1);  // aircraft radial - selected radial
+    // half of the questions are close to the radial (inside full scale), half are full scale
+    // (up to 89 deg off: abeam the station), where a bigger intercept angle is used.
+    const far = Math.random() < 0.5;
+    const A = far ? (Math.random() < 0.5 ? 45 : 90) : (Math.random() < 0.5 ? 30 : 45);   // intercept angle
+    const mag = far ? 11 + Math.floor(Math.random() * 79) : 3 + Math.floor(Math.random() * 8);
+    const d = mag * (Math.random() < 0.5 ? -1 : 1);            // aircraft radial - selected radial
     const acRadial = norm360(radial + d);
 
     const C = outbound ? norm360(radial) : norm360(radial + 180); // course to fly along the radial
@@ -322,15 +333,20 @@ function newIntercept() {
     const s = lineOnLeft ? -1 : 1;                              // intercept heading = C + s*A
     const correctH = norm360(C + s * A);
 
-    const opts = [
+    const cands = [
         { h: correctH,                   ok: true,  why: "" },
         { h: norm360(C - s * A),         ok: false, why: "that is the wrong side - it takes you away from the radial" },
         { h: norm360(C + 180 - s * A),   ok: false, why: "that is the reciprocal track (you mixed up inbound/outbound)" },
-        { h: norm360(C + 180 + s * A),   ok: false, why: "that is the reciprocal track, on the wrong side as well" }
+        { h: norm360(C + 180 + s * A),   ok: false, why: "that is the reciprocal track, on the wrong side as well" },
+        { h: norm360(C),                 ok: false, why: "that is parallel to the radial - you would never intercept it" },
+        { h: norm360(C + 180),           ok: false, why: "that is the reciprocal of the course" }
     ];
+    const seen = new Set();
+    const opts = [];
+    for (const c of cands) { if (!seen.has(c.h) && opts.length < 4) { seen.add(c.h); opts.push(c); } }
     shuffle(opts);
 
-    ic = { radial, outbound, A, d, acRadial, C, rightOfTrack, lineOnLeft, s, correctH, opts };
+    ic = { useQdm, radial, outbound, A, d, acRadial, C, rightOfTrack, lineOnLeft, s, correctH, opts };
 }
 
 // deviation: signed number of dots the line is displaced to the RIGHT of the aircraft (clamped to +-2)
@@ -397,6 +413,32 @@ function drawVorCourse() {
     ctx.restore();
 }
 
+// ND-style VOR bearing pointer: head to the station, tail on the radial the aircraft is on
+function drawRMI() {
+    const a = (ic.acRadial + 180 - heading) * Math.PI / 180;
+    const ux = Math.sin(a), uy = -Math.cos(a);
+    const px = Math.cos(a), py = Math.sin(a);
+    ctx.save();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "butt";
+    ctx.beginPath();
+    ctx.moveTo(ux * (R * 0.5) * 0.93, uy * (R * 0.5) * 0.93);
+    ctx.lineTo(ux * R * 0.93, uy * R * 0.93);          // head
+    ctx.moveTo(-ux * (R * 0.5) * 0.93, -uy * (R * 0.5) * 0.93);
+    ctx.lineTo(-ux * R * 0.93, -uy * R * 0.93);        // tail
+    ctx.stroke();
+    drawArrow(ux * (R * 0.9) * 0.93, uy * (R * 0.9) * 0.93, a - Math.PI / 2, 18);
+    drawArrow(-ux * (R * 0.8) * 0.93, -uy * (R * 0.8) * 0.93, a - Math.PI / 2, 18);
+    ctx.restore();
+}
+
+function interceptInfoText() {
+    const what = ic.useQdm ? (ic.outbound ? `QDR ${fmt(ic.radial)}°` : `QDM ${fmt(ic.C)}°`) : `${ic.outbound ? "OUTBOUND" : "INBOUND"} R-${fmt(ic.radial)}°`;
+    return `HDG ${fmt(heading)}°  ·  Track ${what}\n` +
+        `${ic.A}° intercept` + ((showRadial || showRMI) ? "" : `  ·  You are on R-${fmt(ic.acRadial)}°`);
+}
+
 function drawInterceptSolution() {
     const ca = (ic.C - heading) * Math.PI / 180;
     const ux = Math.sin(ca), uy = -Math.cos(ca);
@@ -426,8 +468,8 @@ function drawInterceptSolution() {
     const t = Math.abs(offDraw) / sinA;
     const hx = wx * t, hy = wy * t;
 
-    ctx.strokeStyle = "#3f3";
-    ctx.fillStyle = "#3f3";
+    ctx.strokeStyle = "#ff4dff";
+    ctx.fillStyle = "#ff4dff";
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -440,6 +482,9 @@ function drawInterceptSolution() {
     ctx.font = `bold ${isPhone ? 16 : 22}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "black";
+    ctx.strokeText(fmt(ic.correctH) + "°", wx * t * 0.5 + 24, wy * t * 0.5);
     ctx.fillText(fmt(ic.correctH) + "°", wx * t * 0.5 + 24, wy * t * 0.5);
 
     ctx.restore();
@@ -453,12 +498,15 @@ function turnText(from, to) {
 
 function answerIntercept(idx) {
     const o = ic.opts[idx];
+    lastIdx = idx;
     setSolutionState(true);
     drawInterceptSolution();
 
     const side = ic.lineOnLeft ? "LEFT" : "RIGHT";
     const explain =
-        `Track ${ic.outbound ? "outbound" : "inbound"} R-${fmt(ic.radial)} → course ${fmt(ic.C)}° (${ic.outbound ? "FROM" : "TO"}). ` +
+        `You are on R-${fmt(ic.acRadial)} (${Math.abs(ic.d)}° ${ic.d > 0 ? "clockwise" : "anticlockwise"} of R-${fmt(ic.radial)}${Math.abs(ic.d) > 10 ? ", full scale" : ""}). ` +
+        (ic.useQdm ? (ic.outbound ? `Track QDR ${fmt(ic.radial)} = outbound on R-${fmt(ic.radial)} →` : `Track QDM ${fmt(ic.C)} = inbound on R-${fmt(ic.radial)} →`)
+                   : `Track ${ic.outbound ? "outbound" : "inbound"} R-${fmt(ic.radial)} →`) + ` course ${fmt(ic.C)}° (${ic.outbound ? "FROM" : "TO"}). ` +
         `Radial is on your ${side} → intercept heading ${fmt(ic.C)}° ${ic.s > 0 ? "+" : "−"} ${ic.A}° = ${fmt(ic.correctH)}° ` +
         `(${turnText(heading, ic.correctH)}).`;
 
@@ -495,9 +543,7 @@ function nextQuestion() {
             `HDG ${String(heading).padStart(3, "0")}°  INB ${String(inbound).padStart(3, "0")}° ${standard ? "Right" : "Left"} Turns`;
     } else {
         newIntercept();
-        $("info").innerText =
-            `HDG ${fmt(heading)}°  ·  Track ${ic.outbound ? "OUTBOUND" : "INBOUND"} R-${fmt(ic.radial)}°\n` +
-            `${ic.A}° intercept` + (showRadial ? "" : `  ·  You are on R-${fmt(ic.acRadial)}°`);
+        $("info").innerText = interceptInfoText();
         document.querySelectorAll(".ic-only").forEach((b, i) => { b.innerText = `${fmt(ic.opts[i].h)}°  (${i + 1})`; });
     }
     drawDG();
@@ -528,9 +574,17 @@ function setMode(m, keepQuestion) {
     document.body.classList.toggle("mode-intercept", m === "intercept");
     $("mode").value = m;
     $("radial-toggle").style.display = m === "intercept" ? "" : "none";
+    $("rmi-toggle").style.display = m === "intercept" ? "" : "none";
+    $("format").style.display = m === "intercept" ? "" : "none";
     try { localStorage.setItem("trainer-mode", m); } catch (e) {}
     resizeCanvas();
     nextQuestion();
+}
+
+function setShowRMI(v) {
+    showRMI = v;
+    try { localStorage.setItem("trainer-show-rmi", v ? "1" : "0"); } catch (e) {}
+    setShowRadial(showRadial);
 }
 
 function setShowRadial(v) {
@@ -540,9 +594,7 @@ function setShowRadial(v) {
         // refresh the prompt text (position is given in text when the display is off)
         const sol = displayingSolution();
         const txt = $("result").innerText;
-        $("info").innerText =
-            `HDG ${fmt(heading)}°  ·  Track ${ic.outbound ? "OUTBOUND" : "INBOUND"} R-${fmt(ic.radial)}°\n` +
-            `${ic.A}° intercept` + (showRadial ? "" : `  ·  You are on R-${fmt(ic.acRadial)}°`);
+        $("info").innerText = interceptInfoText();
         drawDG();
         if (sol) redrawSolution();
     }
@@ -599,14 +651,32 @@ window.addEventListener("resize", () => {
 
 $("mode").addEventListener("change", e => setMode(e.target.value));
 $("show-radial").addEventListener("change", e => setShowRadial(e.target.checked));
+$("show-rmi").addEventListener("change", e => setShowRMI(e.target.checked));
+$("format").addEventListener("change", e => {
+    format = e.target.value;
+    try { localStorage.setItem("trainer-format", format); } catch (err) {}
+    if (mode !== "intercept" || !ic) { nextQuestion(); return; }
+
+    // Same geometry, different wording (mixed leaves the current question as it is).
+    if (format === "qdm") ic.useQdm = true;
+    else if (format === "radial") ic.useQdm = false;
+    $("info").innerText = interceptInfoText();
+    if (displayingSolution() && lastIdx >= 0) { drawDG(); answerIntercept(lastIdx); }
+});
 
 (function init() {
-    let m = "holding", sr = true;
+    let m = "holding", sr = true, rmi = false;
     try {
         m = localStorage.getItem("trainer-mode") || m;
         sr = localStorage.getItem("trainer-show-radial") !== "0";
+        rmi = localStorage.getItem("trainer-show-rmi") === "1";
+        const f = localStorage.getItem("trainer-format");
+        if (f === "radial" || f === "qdm" || f === "mixed") format = f;
     } catch (e) {}
     showRadial = sr;
     $("show-radial").checked = sr;
+    showRMI = rmi;
+    $("format").value = format;
+    $("show-rmi").checked = rmi;
     setMode(m === "intercept" ? "intercept" : "holding");
 })();

@@ -37,7 +37,8 @@ canvas {
 
 #settings {
     display: flex;
-    gap: 16px;
+    gap: 8px 16px;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
     margin-top: 8px;
@@ -53,14 +54,14 @@ canvas {
     font-size: 1rem;
 }
 
-#radial-toggle {
+#radial-toggle, #rmi-toggle {
     display: flex;
     align-items: center;
     gap: 6px;
     white-space: nowrap;
 }
 
-#radial-toggle input {
+#radial-toggle input, #rmi-toggle input {
     width: 20px;
     height: 20px;
 }
